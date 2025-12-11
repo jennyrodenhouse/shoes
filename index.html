@@ -158,68 +158,208 @@
         pointLight2.position.set(5, 3, 5);
         scene.add(pointLight2);
 
-        // Create Shoe function
-        function createShoe(color, positionX) {
+        // Create Boat Shoe function - High fidelity model based on Timberland reference
+        function createShoe(positionX) {
             const shoe = new THREE.Group();
 
-            // Sole (bottom of shoe)
-            const soleGeometry = new THREE.BoxGeometry(1, 0.3, 2);
-            const soleMaterial = new THREE.MeshStandardMaterial({
-                color: 0x333333,
-                roughness: 0.7,
-                metalness: 0.3
+            // Colors based on reference images
+            const leatherColor = 0xF4E4B5; // Pale yellow leather
+            const soleColor = 0x8B6F47; // Brown rubber sole
+            const lacesColor = 0xF4E4B5; // Matching laces
+            const eyeletColor = 0xDAA520; // Gold/brass eyelets
+
+            // Materials
+            const leatherMaterial = new THREE.MeshStandardMaterial({
+                color: leatherColor,
+                roughness: 0.6,
+                metalness: 0.1
             });
+
+            const soleMaterial = new THREE.MeshStandardMaterial({
+                color: soleColor,
+                roughness: 0.9,
+                metalness: 0.0
+            });
+
+            // ===== SOLE =====
+            // Main sole body
+            const soleShape = new THREE.Shape();
+            soleShape.moveTo(-0.5, -1.0);
+            soleShape.lineTo(-0.5, 0.8);
+            soleShape.quadraticCurveTo(-0.5, 1.0, -0.3, 1.0);
+            soleShape.lineTo(0.3, 1.0);
+            soleShape.quadraticCurveTo(0.5, 1.0, 0.5, 0.8);
+            soleShape.lineTo(0.5, -1.0);
+            soleShape.quadraticCurveTo(0.5, -1.1, 0.3, -1.1);
+            soleShape.lineTo(-0.3, -1.1);
+            soleShape.quadraticCurveTo(-0.5, -1.1, -0.5, -1.0);
+
+            const extrudeSettings = { depth: 0.35, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3 };
+            const soleGeometry = new THREE.ExtrudeGeometry(soleShape, extrudeSettings);
             const sole = new THREE.Mesh(soleGeometry, soleMaterial);
-            sole.position.y = 0.15;
+            sole.rotation.x = -Math.PI / 2;
+            sole.position.y = 0.0;
             sole.castShadow = true;
+            sole.receiveShadow = true;
             shoe.add(sole);
 
+            // Sole tread pattern
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const treadGeometry = new THREE.BoxGeometry(0.08, 0.03, 0.08);
+                    const tread = new THREE.Mesh(treadGeometry, soleMaterial);
+                    tread.position.set((j - 1.5) * 0.2, 0.015, (i - 3.5) * 0.25);
+                    shoe.add(tread);
+                }
+            }
+
+            // ===== SHOE BODY =====
+            // Main body (lower part)
+            const bodyGeometry = new THREE.CylinderGeometry(0.55, 0.5, 0.4, 32);
+            const body = new THREE.Mesh(bodyGeometry, leatherMaterial);
+            body.position.set(0, 0.55, 0);
+            body.scale.set(1, 1, 2.2);
+            body.castShadow = true;
+            shoe.add(body);
+
             // Toe cap (rounded front)
-            const toeGeometry = new THREE.SphereGeometry(0.5, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
-            const toeMaterial = new THREE.MeshStandardMaterial({
-                color: color,
-                roughness: 0.4,
-                metalness: 0.6
-            });
-            const toe = new THREE.Mesh(toeGeometry, toeMaterial);
-            toe.position.set(0, 0.5, 0.6);
+            const toeGeometry = new THREE.SphereGeometry(0.55, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+            const toe = new THREE.Mesh(toeGeometry, leatherMaterial);
+            toe.position.set(0, 0.55, 0.9);
             toe.rotation.x = Math.PI / 2;
             toe.castShadow = true;
             shoe.add(toe);
 
-            // Upper body of shoe
-            const upperGeometry = new THREE.BoxGeometry(1, 0.8, 1.5);
-            const upperMaterial = new THREE.MeshStandardMaterial({
-                color: color,
-                roughness: 0.4,
-                metalness: 0.6
-            });
-            const upper = new THREE.Mesh(upperGeometry, upperMaterial);
-            upper.position.set(0, 0.7, -0.2);
-            upper.castShadow = true;
-            shoe.add(upper);
+            // Upper collar/ankle area
+            const collarGeometry = new THREE.CylinderGeometry(0.56, 0.55, 0.3, 32);
+            const collar = new THREE.Mesh(collarGeometry, leatherMaterial);
+            collar.position.set(0, 0.85, -0.6);
+            collar.scale.set(1, 1, 1.3);
+            collar.castShadow = true;
+            shoe.add(collar);
 
-            // Heel (back part)
-            const heelGeometry = new THREE.BoxGeometry(1, 1.2, 0.6);
-            const heelMaterial = new THREE.MeshStandardMaterial({
-                color: color,
-                roughness: 0.4,
-                metalness: 0.6
-            });
-            const heel = new THREE.Mesh(heelGeometry, heelMaterial);
-            heel.position.set(0, 0.9, -0.8);
+            // Heel area
+            const heelGeometry = new THREE.SphereGeometry(0.5, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+            const heel = new THREE.Mesh(heelGeometry, leatherMaterial);
+            heel.position.set(0, 0.55, -1.0);
+            heel.rotation.x = -Math.PI / 2;
             heel.castShadow = true;
             shoe.add(heel);
 
-            // Laces decoration
-            for (let i = 0; i < 3; i++) {
-                const laceGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
-                const laceMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-                const lace = new THREE.Mesh(laceGeometry, laceMaterial);
-                lace.position.set(0, 0.8 + i * 0.2, 0.2 - i * 0.2);
-                lace.rotation.z = Math.PI / 2;
-                shoe.add(lace);
+            // ===== DECORATIVE STITCHING =====
+            // Moc toe stitching (U-shape on top)
+            const stitchingMaterial = new THREE.MeshStandardMaterial({
+                color: 0xD4C4A5,
+                roughness: 0.8
+            });
+
+            // Create stitching lines
+            const stitchPoints = [];
+            for (let i = 0; i <= 20; i++) {
+                const angle = (i / 20) * Math.PI - Math.PI / 2;
+                stitchPoints.push(new THREE.Vector3(
+                    Math.cos(angle) * 0.35,
+                    1.0,
+                    Math.sin(angle) * 0.35 + 0.5
+                ));
             }
+            const stitchCurve = new THREE.CatmullRomCurve3(stitchPoints);
+            const stitchGeometry = new THREE.TubeGeometry(stitchCurve, 20, 0.01, 8, false);
+            const stitching = new THREE.Mesh(stitchGeometry, stitchingMaterial);
+            shoe.add(stitching);
+
+            // ===== EYELETS =====
+            const eyeletMaterial = new THREE.MeshStandardMaterial({
+                color: eyeletColor,
+                roughness: 0.3,
+                metalness: 0.8
+            });
+
+            // Create eyelets on both sides
+            const eyeletPositions = [
+                { x: -0.4, y: 0.8, z: 0.3 },
+                { x: -0.4, y: 0.75, z: 0.0 },
+                { x: -0.4, y: 0.7, z: -0.3 },
+                { x: 0.4, y: 0.8, z: 0.3 },
+                { x: 0.4, y: 0.75, z: 0.0 },
+                { x: 0.4, y: 0.7, z: -0.3 }
+            ];
+
+            eyeletPositions.forEach(pos => {
+                const eyeletGeometry = new THREE.TorusGeometry(0.04, 0.015, 8, 16);
+                const eyelet = new THREE.Mesh(eyeletGeometry, eyeletMaterial);
+                eyelet.position.set(pos.x, pos.y, pos.z);
+                eyelet.rotation.y = Math.PI / 2;
+                shoe.add(eyelet);
+            });
+
+            // ===== LACES =====
+            const lacesMaterial = new THREE.MeshStandardMaterial({
+                color: lacesColor,
+                roughness: 0.7
+            });
+
+            // Create lace segments
+            const laceSegments = [
+                // Right side up
+                { start: [0.4, 0.8, 0.3], end: [-0.4, 0.75, 0.0] },
+                { start: [-0.4, 0.8, 0.3], end: [0.4, 0.75, 0.0] },
+                { start: [0.4, 0.75, 0.0], end: [-0.4, 0.7, -0.3] },
+                { start: [-0.4, 0.75, 0.0], end: [0.4, 0.7, -0.3] }
+            ];
+
+            laceSegments.forEach(segment => {
+                const points = [
+                    new THREE.Vector3(...segment.start),
+                    new THREE.Vector3(...segment.end)
+                ];
+                const laceCurve = new THREE.CatmullRomCurve3(points);
+                const laceGeometry = new THREE.TubeGeometry(laceCurve, 8, 0.02, 8, false);
+                const lace = new THREE.Mesh(laceGeometry, lacesMaterial);
+                shoe.add(lace);
+            });
+
+            // Lace bow on top
+            const bowLoopGeometry = new THREE.TorusGeometry(0.12, 0.02, 8, 16);
+            const bowLoop1 = new THREE.Mesh(bowLoopGeometry, lacesMaterial);
+            bowLoop1.position.set(-0.15, 0.85, 0.1);
+            bowLoop1.rotation.x = Math.PI / 4;
+            bowLoop1.rotation.z = Math.PI / 6;
+            shoe.add(bowLoop1);
+
+            const bowLoop2 = new THREE.Mesh(bowLoopGeometry, lacesMaterial);
+            bowLoop2.position.set(0.15, 0.85, 0.1);
+            bowLoop2.rotation.x = Math.PI / 4;
+            bowLoop2.rotation.z = -Math.PI / 6;
+            shoe.add(bowLoop2);
+
+            // ===== SIDE DETAILS =====
+            // Add subtle side panel stitching
+            const sidePanelPoints1 = [
+                new THREE.Vector3(0.52, 0.4, -0.8),
+                new THREE.Vector3(0.52, 0.5, -0.3),
+                new THREE.Vector3(0.52, 0.6, 0.2)
+            ];
+            const sidePanelCurve1 = new THREE.CatmullRomCurve3(sidePanelPoints1);
+            const sidePanelGeometry1 = new THREE.TubeGeometry(sidePanelCurve1, 10, 0.01, 8, false);
+            const sidePanel1 = new THREE.Mesh(sidePanelGeometry1, stitchingMaterial);
+            shoe.add(sidePanel1);
+
+            const sidePanelPoints2 = [
+                new THREE.Vector3(-0.52, 0.4, -0.8),
+                new THREE.Vector3(-0.52, 0.5, -0.3),
+                new THREE.Vector3(-0.52, 0.6, 0.2)
+            ];
+            const sidePanelCurve2 = new THREE.CatmullRomCurve3(sidePanelPoints2);
+            const sidePanelGeometry2 = new THREE.TubeGeometry(sidePanelCurve2, 10, 0.01, 8, false);
+            const sidePanel2 = new THREE.Mesh(sidePanelGeometry2, stitchingMaterial);
+            shoe.add(sidePanel2);
+
+            // Heel tab
+            const heelTabGeometry = new THREE.BoxGeometry(0.3, 0.15, 0.05);
+            const heelTab = new THREE.Mesh(heelTabGeometry, leatherMaterial);
+            heelTab.position.set(0, 0.95, -1.05);
+            shoe.add(heelTab);
 
             shoe.position.x = positionX;
             shoe.position.y = 1;
@@ -227,9 +367,9 @@
             return shoe;
         }
 
-        // Create left and right shoes
-        const leftShoe = createShoe(0xff3366, -1.2);
-        const rightShoe = createShoe(0x3366ff, 1.2);
+        // Create left and right shoes (identical yellow boat shoes)
+        const leftShoe = createShoe(-1.5);
+        const rightShoe = createShoe(1.5);
 
         scene.add(leftShoe);
         scene.add(rightShoe);
