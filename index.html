@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Animated 3D Shoes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Video Player</title>
     <style>
         * {
             margin: 0;
@@ -12,548 +12,759 @@
         }
 
         body {
-            font-family: 'Arial', sans-serif;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
             overflow: hidden;
-            background: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        #canvas-container {
+        #player-wrapper {
+            position: relative;
             width: 100vw;
             height: 100vh;
+            background: #000;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        /* Bottom controls bar */
+        #controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 60px 20px 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.75));
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: opacity 0.3s;
+        }
+
+        #controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Seekbar */
+        #seekbar-track {
             position: relative;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: height 0.15s;
         }
 
-        #info {
+        #seekbar-track:hover,
+        #seekbar-track.active {
+            height: 6px;
+        }
+
+        #seekbar-fill {
+            height: 100%;
+            background: #fff;
+            border-radius: 2px;
+            width: 0%;
+            pointer-events: none;
+        }
+
+        #seekbar-thumb {
             position: absolute;
-            top: 20px;
+            top: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: transform 0.15s;
+            left: 0%;
+        }
+
+        #seekbar-track:hover #seekbar-thumb,
+        #seekbar-track.active #seekbar-thumb {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Bottom row: play button + time + speed */
+        #bottom-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #play-btn {
+            flex-shrink: 0;
+            width: 36px;
+            height: 36px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #play-btn svg {
+            fill: white;
+            width: 28px;
+            height: 28px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        }
+
+        #time-display {
+            color: rgba(255,255,255,0.85);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        #speed-badge {
+            margin-left: auto;
+            background: rgba(255,255,255,0.15);
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.02em;
+            transition: background 0.2s, opacity 0.3s;
+            opacity: 0;
+        }
+
+        #speed-badge.visible {
+            opacity: 1;
+        }
+
+        /* Center play/pause overlay flash */
+        #center-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.5);
+            width: 72px;
+            height: 72px;
+            background: rgba(0,0,0,0.55);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: none;
+        }
+
+        #center-icon svg {
+            fill: white;
+            width: 36px;
+            height: 36px;
+        }
+
+        #center-icon.flash {
+            animation: iconFlash 0.45s ease-out forwards;
+        }
+
+        @keyframes iconFlash {
+            0%   { opacity: 1; transform: translate(-50%,-50%) scale(0.85); }
+            40%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%,-50%) scale(1.1); }
+        }
+
+        /* Gesture feedback toast */
+        #gesture-toast {
+            position: absolute;
+            top: 24px;
             left: 50%;
             transform: translateX(-50%);
-            text-align: center;
-            color: #333333;
-            z-index: 10;
-            background: rgba(240, 240, 240, 0.9);
-            padding: 20px 40px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid #dddddd;
+            background: rgba(0,0,0,0.65);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
-        #info h1 {
-            margin-bottom: 15px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        #gesture-toast.show {
+            opacity: 1;
         }
 
-        #info p {
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-
-        #command-input {
-            position: absolute;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-        }
-
-        #action-input {
-            width: 400px;
-            padding: 15px 20px;
-            font-size: 1.2em;
-            border: 3px solid #333333;
-            border-radius: 25px;
-            background: rgba(255, 255, 255, 0.9);
-            outline: none;
-            text-align: center;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-
-        #action-input:focus {
-            background: white;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-            transform: scale(1.05);
-        }
-
-        #current-action {
+        /* Seek delta overlay (shown during drag/scroll) */
+        #seek-delta {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 4em;
-            color: #333333;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.6);
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s ease;
-            font-weight: bold;
-            z-index: 5;
+            transition: opacity 0.25s;
+            text-align: center;
         }
 
-        #current-action.show {
-            opacity: 0.8;
+        #seek-delta.show {
+            opacity: 1;
         }
 
-        .command-badge {
-            display: inline-block;
-            background: rgba(0, 0, 0, 0.1);
-            padding: 5px 15px;
-            margin: 5px;
-            border-radius: 15px;
-            font-size: 0.9em;
+        #seek-delta .delta-time {
+            font-size: 36px;
+            display: block;
+        }
+
+        #seek-delta .delta-label {
+            font-size: 13px;
+            font-weight: 400;
+            opacity: 0.75;
+            display: block;
+        }
+
+        /* Speed overlay (shown during pinch) */
+        #speed-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s;
+            text-align: center;
+        }
+
+        #speed-overlay.show {
+            opacity: 1;
+        }
+
+        #speed-overlay .speed-value {
+            font-size: 40px;
+            display: block;
+        }
+
+        #speed-overlay .speed-label {
+            font-size: 13px;
+            font-weight: 400;
+            opacity: 0.75;
+            display: block;
+        }
+
+        /* Hint overlay shown on first load */
+        #hints {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            transition: opacity 0.6s;
+        }
+
+        #hints.hidden {
+            opacity: 0;
+        }
+
+        #hints-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 32px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 16px;
+            padding: 28px 36px;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .hint-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .hint-icon {
+            font-size: 26px;
+            width: 36px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .hint-text strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .hint-text span {
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
         }
     </style>
 </head>
 <body>
-    <div id="canvas-container"></div>
+<div id="player-wrapper">
+    <video id="video" preload="metadata" playsinline>
+        <source src="IxDGradShowSetup.mp4" type="video/mp4">
+    </video>
 
-    <div id="info">
-        <h1>🎮 Animated 3D Shoes</h1>
-        <p>Type an action below and press Enter!</p>
-        <div>
-            <span class="command-badge">walk</span>
-            <span class="command-badge">run</span>
-            <span class="command-badge">jump</span>
-            <span class="command-badge">dance</span>
-            <span class="command-badge">stop</span>
+    <!-- Gesture hints overlay -->
+    <div id="hints">
+        <div id="hints-inner">
+            <div class="hint-item">
+                <div class="hint-icon">👆</div>
+                <div class="hint-text">
+                    <strong>Tap</strong>
+                    <span>Play / Pause</span>
+                </div>
+            </div>
+            <div class="hint-item">
+                <div class="hint-icon">↔️</div>
+                <div class="hint-text">
+                    <strong>Drag</strong>
+                    <span>Scrub timeline</span>
+                </div>
+            </div>
+            <div class="hint-item">
+                <div class="hint-icon">🖱️</div>
+                <div class="hint-text">
+                    <strong>Scroll</strong>
+                    <span>Scrub timeline</span>
+                </div>
+            </div>
+            <div class="hint-item">
+                <div class="hint-icon">🤌</div>
+                <div class="hint-text">
+                    <strong>Pinch / Stretch</strong>
+                    <span>Playback speed</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="command-input">
-        <input type="text" id="action-input" placeholder="Type: walk, run, jump, dance..." />
+    <!-- Seek delta display -->
+    <div id="seek-delta">
+        <span class="delta-time"></span>
+        <span class="delta-label">scrubbing</span>
     </div>
 
-    <div id="current-action"></div>
+    <!-- Speed overlay -->
+    <div id="speed-overlay">
+        <span class="speed-value"></span>
+        <span class="speed-label">playback speed</span>
+    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        // Scene setup
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xffffff);
+    <!-- Center flash icon -->
+    <div id="center-icon">
+        <svg id="center-svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </div>
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 2, 8);
-        camera.lookAt(0, 0, 0);
+    <!-- Gesture toast -->
+    <div id="gesture-toast"></div>
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.getElementById('canvas-container').appendChild(renderer.domElement);
+    <!-- Controls -->
+    <div id="controls">
+        <div id="seekbar-track">
+            <div id="seekbar-fill"></div>
+            <div id="seekbar-thumb"></div>
+        </div>
+        <div id="bottom-row">
+            <button id="play-btn" aria-label="Play">
+                <svg id="play-svg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <span id="time-display">0:00 / 0:00</span>
+            <span id="speed-badge">1.0×</span>
+        </div>
+    </div>
+</div>
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+<script>
+    const video       = document.getElementById('video');
+    const controls    = document.getElementById('controls');
+    const playSvg     = document.getElementById('play-svg');
+    const centerIcon  = document.getElementById('center-icon');
+    const centerSvg   = document.getElementById('center-svg');
+    const timeDisplay = document.getElementById('time-display');
+    const seekTrack   = document.getElementById('seekbar-track');
+    const seekFill    = document.getElementById('seekbar-fill');
+    const seekThumb   = document.getElementById('seekbar-thumb');
+    const speedBadge  = document.getElementById('speed-badge');
+    const seekDelta   = document.getElementById('seek-delta');
+    const seekDeltaTime  = seekDelta.querySelector('.delta-time');
+    const speedOverlay   = document.getElementById('speed-overlay');
+    const speedValue     = speedOverlay.querySelector('.speed-value');
+    const gestureToast   = document.getElementById('gesture-toast');
+    const hints          = document.getElementById('hints');
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 10, 5);
-        directionalLight.castShadow = true;
-        scene.add(directionalLight);
+    // ── SVG paths ─────────────────────────────────────────────────────────────
+    const PLAY_PATH  = 'M8 5v14l11-7z';
+    const PAUSE_PATH = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z';
 
-        const pointLight1 = new THREE.PointLight(0xff00ff, 0.5, 50);
-        pointLight1.position.set(-5, 3, 5);
-        scene.add(pointLight1);
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function formatTime(s) {
+        if (isNaN(s)) return '0:00';
+        const m = Math.floor(s / 60);
+        const sec = Math.floor(s % 60);
+        return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
 
-        const pointLight2 = new THREE.PointLight(0x00ffff, 0.5, 50);
-        pointLight2.position.set(5, 3, 5);
-        scene.add(pointLight2);
+    function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
 
-        // Create Boat Shoe function - High fidelity model based on Timberland reference
-        function createShoe(positionX) {
-            const shoe = new THREE.Group();
+    // ── Toast ──────────────────────────────────────────────────────────────────
+    let toastTimer = null;
+    function showToast(msg) {
+        gestureToast.textContent = msg;
+        gestureToast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => gestureToast.classList.remove('show'), 1200);
+    }
 
-            // Colors based on reference images
-            const leatherColor = 0xF4E4B5; // Pale yellow leather
-            const soleColor = 0x8B6F47; // Brown rubber sole
-            const lacesColor = 0xF4E4B5; // Matching laces
-            const eyeletColor = 0xDAA520; // Gold/brass eyelets
+    // ── Controls auto-hide ────────────────────────────────────────────────────
+    let hideTimer = null;
+    function showControls() {
+        controls.classList.remove('hidden');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            if (!video.paused) controls.classList.add('hidden');
+        }, 3000);
+    }
 
-            // Materials
-            const leatherMaterial = new THREE.MeshStandardMaterial({
-                color: leatherColor,
-                roughness: 0.6,
-                metalness: 0.1
-            });
+    // ── Play / Pause ──────────────────────────────────────────────────────────
+    function togglePlay() {
+        if (video.paused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+    }
 
-            const soleMaterial = new THREE.MeshStandardMaterial({
-                color: soleColor,
-                roughness: 0.9,
-                metalness: 0.0
-            });
+    function flashCenterIcon(playing) {
+        centerSvg.querySelector('path').setAttribute('d', playing ? PAUSE_PATH : PLAY_PATH);
+        centerIcon.classList.remove('flash');
+        void centerIcon.offsetWidth; // reflow
+        centerIcon.classList.add('flash');
+    }
 
-            // ===== SOLE =====
-            // Main sole body
-            const soleShape = new THREE.Shape();
-            soleShape.moveTo(-0.5, -1.0);
-            soleShape.lineTo(-0.5, 0.8);
-            soleShape.quadraticCurveTo(-0.5, 1.0, -0.3, 1.0);
-            soleShape.lineTo(0.3, 1.0);
-            soleShape.quadraticCurveTo(0.5, 1.0, 0.5, 0.8);
-            soleShape.lineTo(0.5, -1.0);
-            soleShape.quadraticCurveTo(0.5, -1.1, 0.3, -1.1);
-            soleShape.lineTo(-0.3, -1.1);
-            soleShape.quadraticCurveTo(-0.5, -1.1, -0.5, -1.0);
+    video.addEventListener('play', () => {
+        playSvg.querySelector('path').setAttribute('d', PAUSE_PATH);
+        showControls();
+    });
 
-            const extrudeSettings = { depth: 0.35, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.05, bevelSegments: 3 };
-            const soleGeometry = new THREE.ExtrudeGeometry(soleShape, extrudeSettings);
-            const sole = new THREE.Mesh(soleGeometry, soleMaterial);
-            sole.rotation.x = -Math.PI / 2;
-            sole.position.y = 0.0;
-            sole.castShadow = true;
-            sole.receiveShadow = true;
-            shoe.add(sole);
+    video.addEventListener('pause', () => {
+        playSvg.querySelector('path').setAttribute('d', PLAY_PATH);
+        controls.classList.remove('hidden');
+        clearTimeout(hideTimer);
+    });
 
-            // Sole tread pattern
-            for (let i = 0; i < 8; i++) {
-                for (let j = 0; j < 4; j++) {
-                    const treadGeometry = new THREE.BoxGeometry(0.08, 0.03, 0.08);
-                    const tread = new THREE.Mesh(treadGeometry, soleMaterial);
-                    tread.position.set((j - 1.5) * 0.2, 0.015, (i - 3.5) * 0.25);
-                    shoe.add(tread);
-                }
+    document.getElementById('play-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlay();
+    });
+
+    // ── Timeline / Seekbar ────────────────────────────────────────────────────
+    function updateSeekbar() {
+        if (!video.duration) return;
+        const pct = (video.currentTime / video.duration) * 100;
+        seekFill.style.width = pct + '%';
+        seekThumb.style.left = pct + '%';
+        timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+    }
+
+    video.addEventListener('timeupdate', updateSeekbar);
+    video.addEventListener('loadedmetadata', updateSeekbar);
+
+    // Click on seekbar to seek
+    seekTrack.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const rect = seekTrack.getBoundingClientRect();
+        const pct = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+        video.currentTime = pct * video.duration;
+        showToast('Seeked to ' + formatTime(video.currentTime));
+    });
+
+    // Drag seekbar
+    let seekbarDragging = false;
+    seekTrack.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        seekbarDragging = true;
+        seekTrack.classList.add('active');
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!seekbarDragging) return;
+        const rect = seekTrack.getBoundingClientRect();
+        const pct = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+        video.currentTime = pct * video.duration;
+    });
+    window.addEventListener('mouseup', () => {
+        if (seekbarDragging) {
+            seekbarDragging = false;
+            seekTrack.classList.remove('active');
+        }
+    });
+
+    // ── Speed badge ───────────────────────────────────────────────────────────
+    function updateSpeedBadge() {
+        const r = video.playbackRate;
+        const label = r.toFixed(r % 1 === 0 ? 0 : 1) + '×';
+        speedBadge.textContent = label;
+        speedBadge.classList.toggle('visible', r !== 1);
+    }
+    updateSpeedBadge();
+
+    // ── Hints dismissal ───────────────────────────────────────────────────────
+    let hintsDismissed = false;
+    function dismissHints() {
+        if (!hintsDismissed) {
+            hintsDismissed = true;
+            hints.classList.add('hidden');
+        }
+    }
+
+    // ── Scroll to scrub ───────────────────────────────────────────────────────
+    let scrollSeekTimer = null;
+    window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        dismissHints();
+        showControls();
+
+        // Normalize delta: positive = forward, negative = backward
+        // Typically deltaY: positive = scroll down = go back; negate for intuitive fwd scroll
+        const delta = -e.deltaY * 0.05;
+        const newTime = clamp(video.currentTime + delta, 0, video.duration || 0);
+        video.currentTime = newTime;
+
+        const sign = delta >= 0 ? '+' : '';
+        seekDeltaTime.textContent = sign + delta.toFixed(1) + 's';
+        seekDelta.classList.add('show');
+        clearTimeout(scrollSeekTimer);
+        scrollSeekTimer = setTimeout(() => seekDelta.classList.remove('show'), 600);
+
+        showToast('Scroll  ' + (delta >= 0 ? '▶' : '◀') + '  ' + formatTime(newTime));
+    }, { passive: false });
+
+    // ── Touch gesture state ───────────────────────────────────────────────────
+    let touchState = 'idle'; // idle | tap-pending | dragging | pinching
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartWallTime = 0;
+    let dragBaseTime = 0;    // video.currentTime at drag start
+
+    let pinchStartDist = 0;
+    let pinchBaseSpeed = 1;
+
+    let dragSeekTimer = null;
+
+    const TAP_MAX_DIST = 12;
+    const TAP_MAX_MS   = 280;
+    const DRAG_MIN_DIST = 8;
+
+    // Pixels per second of video scrub during drag
+    const SCRUB_SENSITIVITY = 0.15; // seconds per pixel
+
+    function getTouchDist(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    document.getElementById('player-wrapper').addEventListener('touchstart', (e) => {
+        dismissHints();
+        showControls();
+
+        if (e.touches.length === 1) {
+            touchState = 'tap-pending';
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchStartWallTime = Date.now();
+            dragBaseTime = video.currentTime;
+        } else if (e.touches.length === 2) {
+            touchState = 'pinching';
+            pinchStartDist = getTouchDist(e.touches);
+            pinchBaseSpeed = video.playbackRate;
+            speedOverlay.classList.add('show');
+        }
+    }, { passive: true });
+
+    document.getElementById('player-wrapper').addEventListener('touchmove', (e) => {
+        e.preventDefault();
+
+        if (touchState === 'pinching' && e.touches.length === 2) {
+            const dist = getTouchDist(e.touches);
+            const ratio = dist / pinchStartDist;
+            // Scale speed: stretch = faster, pinch = slower. Clamp 0.25x–4x
+            const newSpeed = clamp(pinchBaseSpeed * ratio, 0.25, 4);
+            video.playbackRate = newSpeed;
+            updateSpeedBadge();
+
+            const label = newSpeed.toFixed(1) + '×';
+            speedValue.textContent = label;
+        }
+
+        if ((touchState === 'tap-pending' || touchState === 'dragging') && e.touches.length === 1) {
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+
+            if (touchState === 'tap-pending' && Math.abs(dx) > DRAG_MIN_DIST) {
+                touchState = 'dragging';
+                seekDelta.classList.add('show');
             }
 
-            // ===== SHOE BODY =====
-            // Main body (lower part)
-            const bodyGeometry = new THREE.CylinderGeometry(0.55, 0.5, 0.4, 32);
-            const body = new THREE.Mesh(bodyGeometry, leatherMaterial);
-            body.position.set(0, 0.55, 0);
-            body.scale.set(1, 1, 2.2);
-            body.castShadow = true;
-            shoe.add(body);
+            if (touchState === 'dragging') {
+                const delta = dx * SCRUB_SENSITIVITY;
+                const newTime = clamp(dragBaseTime + delta, 0, video.duration || 0);
+                video.currentTime = newTime;
 
-            // Toe cap (rounded front)
-            const toeGeometry = new THREE.SphereGeometry(0.55, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
-            const toe = new THREE.Mesh(toeGeometry, leatherMaterial);
-            toe.position.set(0, 0.55, 0.9);
-            toe.rotation.x = Math.PI / 2;
-            toe.castShadow = true;
-            shoe.add(toe);
+                const sign = delta >= 0 ? '+' : '';
+                seekDeltaTime.textContent = sign + delta.toFixed(1) + 's';
 
-            // Upper collar/ankle area
-            const collarGeometry = new THREE.CylinderGeometry(0.56, 0.55, 0.3, 32);
-            const collar = new THREE.Mesh(collarGeometry, leatherMaterial);
-            collar.position.set(0, 0.85, -0.6);
-            collar.scale.set(1, 1, 1.3);
-            collar.castShadow = true;
-            shoe.add(collar);
-
-            // Heel area
-            const heelGeometry = new THREE.SphereGeometry(0.5, 32, 32, 0, Math.PI * 2, 0, Math.PI / 2);
-            const heel = new THREE.Mesh(heelGeometry, leatherMaterial);
-            heel.position.set(0, 0.55, -1.0);
-            heel.rotation.x = -Math.PI / 2;
-            heel.castShadow = true;
-            shoe.add(heel);
-
-            // ===== DECORATIVE STITCHING =====
-            // Moc toe stitching (U-shape on top)
-            const stitchingMaterial = new THREE.MeshStandardMaterial({
-                color: 0xD4C4A5,
-                roughness: 0.8
-            });
-
-            // Create stitching lines
-            const stitchPoints = [];
-            for (let i = 0; i <= 20; i++) {
-                const angle = (i / 20) * Math.PI - Math.PI / 2;
-                stitchPoints.push(new THREE.Vector3(
-                    Math.cos(angle) * 0.35,
-                    1.0,
-                    Math.sin(angle) * 0.35 + 0.5
-                ));
+                clearTimeout(dragSeekTimer);
             }
-            const stitchCurve = new THREE.CatmullRomCurve3(stitchPoints);
-            const stitchGeometry = new THREE.TubeGeometry(stitchCurve, 20, 0.01, 8, false);
-            const stitching = new THREE.Mesh(stitchGeometry, stitchingMaterial);
-            shoe.add(stitching);
-
-            // ===== EYELETS =====
-            const eyeletMaterial = new THREE.MeshStandardMaterial({
-                color: eyeletColor,
-                roughness: 0.3,
-                metalness: 0.8
-            });
-
-            // Create eyelets on both sides
-            const eyeletPositions = [
-                { x: -0.4, y: 0.8, z: 0.3 },
-                { x: -0.4, y: 0.75, z: 0.0 },
-                { x: -0.4, y: 0.7, z: -0.3 },
-                { x: 0.4, y: 0.8, z: 0.3 },
-                { x: 0.4, y: 0.75, z: 0.0 },
-                { x: 0.4, y: 0.7, z: -0.3 }
-            ];
-
-            eyeletPositions.forEach(pos => {
-                const eyeletGeometry = new THREE.TorusGeometry(0.04, 0.015, 8, 16);
-                const eyelet = new THREE.Mesh(eyeletGeometry, eyeletMaterial);
-                eyelet.position.set(pos.x, pos.y, pos.z);
-                eyelet.rotation.y = Math.PI / 2;
-                shoe.add(eyelet);
-            });
-
-            // ===== LACES =====
-            const lacesMaterial = new THREE.MeshStandardMaterial({
-                color: lacesColor,
-                roughness: 0.7
-            });
-
-            // Create lace segments
-            const laceSegments = [
-                // Right side up
-                { start: [0.4, 0.8, 0.3], end: [-0.4, 0.75, 0.0] },
-                { start: [-0.4, 0.8, 0.3], end: [0.4, 0.75, 0.0] },
-                { start: [0.4, 0.75, 0.0], end: [-0.4, 0.7, -0.3] },
-                { start: [-0.4, 0.75, 0.0], end: [0.4, 0.7, -0.3] }
-            ];
-
-            laceSegments.forEach(segment => {
-                const points = [
-                    new THREE.Vector3(...segment.start),
-                    new THREE.Vector3(...segment.end)
-                ];
-                const laceCurve = new THREE.CatmullRomCurve3(points);
-                const laceGeometry = new THREE.TubeGeometry(laceCurve, 8, 0.02, 8, false);
-                const lace = new THREE.Mesh(laceGeometry, lacesMaterial);
-                shoe.add(lace);
-            });
-
-            // Lace bow on top
-            const bowLoopGeometry = new THREE.TorusGeometry(0.12, 0.02, 8, 16);
-            const bowLoop1 = new THREE.Mesh(bowLoopGeometry, lacesMaterial);
-            bowLoop1.position.set(-0.15, 0.85, 0.1);
-            bowLoop1.rotation.x = Math.PI / 4;
-            bowLoop1.rotation.z = Math.PI / 6;
-            shoe.add(bowLoop1);
-
-            const bowLoop2 = new THREE.Mesh(bowLoopGeometry, lacesMaterial);
-            bowLoop2.position.set(0.15, 0.85, 0.1);
-            bowLoop2.rotation.x = Math.PI / 4;
-            bowLoop2.rotation.z = -Math.PI / 6;
-            shoe.add(bowLoop2);
-
-            // ===== SIDE DETAILS =====
-            // Add subtle side panel stitching
-            const sidePanelPoints1 = [
-                new THREE.Vector3(0.52, 0.4, -0.8),
-                new THREE.Vector3(0.52, 0.5, -0.3),
-                new THREE.Vector3(0.52, 0.6, 0.2)
-            ];
-            const sidePanelCurve1 = new THREE.CatmullRomCurve3(sidePanelPoints1);
-            const sidePanelGeometry1 = new THREE.TubeGeometry(sidePanelCurve1, 10, 0.01, 8, false);
-            const sidePanel1 = new THREE.Mesh(sidePanelGeometry1, stitchingMaterial);
-            shoe.add(sidePanel1);
-
-            const sidePanelPoints2 = [
-                new THREE.Vector3(-0.52, 0.4, -0.8),
-                new THREE.Vector3(-0.52, 0.5, -0.3),
-                new THREE.Vector3(-0.52, 0.6, 0.2)
-            ];
-            const sidePanelCurve2 = new THREE.CatmullRomCurve3(sidePanelPoints2);
-            const sidePanelGeometry2 = new THREE.TubeGeometry(sidePanelCurve2, 10, 0.01, 8, false);
-            const sidePanel2 = new THREE.Mesh(sidePanelGeometry2, stitchingMaterial);
-            shoe.add(sidePanel2);
-
-            // Heel tab
-            const heelTabGeometry = new THREE.BoxGeometry(0.3, 0.15, 0.05);
-            const heelTab = new THREE.Mesh(heelTabGeometry, leatherMaterial);
-            heelTab.position.set(0, 0.95, -1.05);
-            shoe.add(heelTab);
-
-            shoe.position.x = positionX;
-            shoe.position.y = 1;
-
-            return shoe;
         }
+    }, { passive: false });
 
-        // Create left and right shoes (identical yellow boat shoes)
-        const leftShoe = createShoe(-1.5);
-        const rightShoe = createShoe(1.5);
+    document.getElementById('player-wrapper').addEventListener('touchend', (e) => {
+        if (touchState === 'tap-pending') {
+            const elapsed = Date.now() - touchStartWallTime;
+            const dx = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+            const dy = (e.changedTouches[0]?.clientY ?? touchStartY) - touchStartY;
+            const dist = Math.hypot(dx, dy);
 
-        scene.add(leftShoe);
-        scene.add(rightShoe);
-
-        // Ground plane (invisible but helps with depth perception)
-        const groundGeometry = new THREE.CircleGeometry(10, 32);
-        const groundMaterial = new THREE.MeshStandardMaterial({
-            color: 0xf5f5f5,
-            roughness: 0.8,
-            opacity: 0.5,
-            transparent: true
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-        ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // Animation state
-        let currentAnimation = 'idle';
-        let animationTime = 0;
-        let animationSpeed = 1;
-
-        // Animation functions
-        function animateIdle(time) {
-            const float = Math.sin(time * 2) * 0.1;
-            leftShoe.position.y = 1 + float;
-            rightShoe.position.y = 1 + float;
-        }
-
-        function animateWalk(time) {
-            const speed = 2;
-            const stepHeight = 0.5;
-            const stepLength = 0.3;
-
-            leftShoe.position.y = 1 + Math.abs(Math.sin(time * speed)) * stepHeight;
-            rightShoe.position.y = 1 + Math.abs(Math.sin(time * speed + Math.PI)) * stepHeight;
-
-            leftShoe.position.z = Math.sin(time * speed) * stepLength;
-            rightShoe.position.z = Math.sin(time * speed + Math.PI) * stepLength;
-
-            leftShoe.rotation.x = Math.sin(time * speed) * 0.3;
-            rightShoe.rotation.x = Math.sin(time * speed + Math.PI) * 0.3;
-        }
-
-        function animateRun(time) {
-            const speed = 4;
-            const stepHeight = 0.8;
-            const stepLength = 0.5;
-
-            leftShoe.position.y = 1 + Math.abs(Math.sin(time * speed)) * stepHeight;
-            rightShoe.position.y = 1 + Math.abs(Math.sin(time * speed + Math.PI)) * stepHeight;
-
-            leftShoe.position.z = Math.sin(time * speed) * stepLength;
-            rightShoe.position.z = Math.sin(time * speed + Math.PI) * stepLength;
-
-            leftShoe.rotation.x = Math.sin(time * speed) * 0.5;
-            rightShoe.rotation.x = Math.sin(time * speed + Math.PI) * 0.5;
-
-            // Add some dynamic tilt
-            leftShoe.rotation.z = Math.sin(time * speed) * 0.2;
-            rightShoe.rotation.z = Math.sin(time * speed + Math.PI) * 0.2;
-        }
-
-        function animateJump(time) {
-            const jumpHeight = 2.5;
-            const jumpTime = time % 2;
-
-            let height = 1;
-            if (jumpTime < 1) {
-                height = 1 + Math.sin(jumpTime * Math.PI) * jumpHeight;
-            }
-
-            leftShoe.position.y = height;
-            rightShoe.position.y = height;
-
-            // Point toes down when in air
-            if (jumpTime < 1 && jumpTime > 0.2) {
-                leftShoe.rotation.x = -0.5;
-                rightShoe.rotation.x = -0.5;
-            } else {
-                leftShoe.rotation.x = 0;
-                rightShoe.rotation.x = 0;
+            if (dist < TAP_MAX_DIST && elapsed < TAP_MAX_MS) {
+                const wasPlaying = !video.paused;
+                togglePlay();
+                flashCenterIcon(wasPlaying);
+                showToast(wasPlaying ? '⏸ Paused' : '▶ Playing');
             }
         }
 
-        function animateDance(time) {
-            const speed = 3;
-
-            // Complex dance movement
-            leftShoe.position.y = 1 + Math.abs(Math.sin(time * speed)) * 0.5;
-            rightShoe.position.y = 1 + Math.abs(Math.cos(time * speed)) * 0.5;
-
-            leftShoe.position.x = -1.2 + Math.sin(time * speed * 0.5) * 0.3;
-            rightShoe.position.x = 1.2 + Math.cos(time * speed * 0.5) * 0.3;
-
-            leftShoe.rotation.y = Math.sin(time * speed) * 0.5;
-            rightShoe.rotation.y = Math.cos(time * speed) * 0.5;
-
-            leftShoe.rotation.z = Math.sin(time * speed * 2) * 0.3;
-            rightShoe.rotation.z = Math.cos(time * speed * 2) * 0.3;
+        if (touchState === 'dragging') {
+            dragSeekTimer = setTimeout(() => seekDelta.classList.remove('show'), 600);
+            showToast('Seeked to ' + formatTime(video.currentTime));
         }
 
-        // Handle input
-        const actionInput = document.getElementById('action-input');
-        const currentActionDiv = document.getElementById('current-action');
-
-        actionInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const action = actionInput.value.toLowerCase().trim();
-                actionInput.value = '';
-
-                if (['walk', 'run', 'jump', 'dance', 'stop', 'idle'].includes(action)) {
-                    currentAnimation = action === 'stop' ? 'idle' : action;
-
-                    // Show action name
-                    currentActionDiv.textContent = action.toUpperCase();
-                    currentActionDiv.classList.add('show');
-
-                    setTimeout(() => {
-                        currentActionDiv.classList.remove('show');
-                    }, 1500);
-
-                    // Reset positions and rotations
-                    animationTime = 0;
-                }
+        if (touchState === 'pinching' || e.touches.length < 2) {
+            if (touchState === 'pinching') {
+                speedOverlay.classList.remove('show');
+                showToast('Speed: ' + video.playbackRate.toFixed(1) + '×');
             }
-        });
-
-        // Animation loop
-        function animate() {
-            requestAnimationFrame(animate);
-
-            animationTime += 0.016; // ~60fps
-
-            // Reset rotations each frame
-            leftShoe.rotation.x = 0;
-            leftShoe.rotation.y = 0;
-            leftShoe.rotation.z = 0;
-            rightShoe.rotation.x = 0;
-            rightShoe.rotation.y = 0;
-            rightShoe.rotation.z = 0;
-
-            // Apply current animation
-            switch(currentAnimation) {
-                case 'walk':
-                    animateWalk(animationTime);
-                    break;
-                case 'run':
-                    animateRun(animationTime);
-                    break;
-                case 'jump':
-                    animateJump(animationTime);
-                    break;
-                case 'dance':
-                    animateDance(animationTime);
-                    break;
-                default:
-                    animateIdle(animationTime);
-            }
-
-            // Rotate lights for dynamic effect
-            pointLight1.position.x = Math.sin(animationTime * 0.5) * 5;
-            pointLight1.position.z = Math.cos(animationTime * 0.5) * 5;
-            pointLight2.position.x = Math.cos(animationTime * 0.5) * 5;
-            pointLight2.position.z = Math.sin(animationTime * 0.5) * 5;
-
-            renderer.render(scene, camera);
         }
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        if (e.touches.length === 0) {
+            touchState = 'idle';
+        }
+    }, { passive: true });
 
-        // Start animation
-        animate();
+    // ── Mouse drag to scrub (desktop) ─────────────────────────────────────────
+    let mouseDragActive = false;
+    let mouseDragBaseX = 0;
+    let mouseDragBaseTime = 0;
+    let mouseMoved = false;
 
-        // Focus input on load
-        window.addEventListener('load', () => {
-            actionInput.focus();
-        });
-    </script>
+    document.getElementById('player-wrapper').addEventListener('mousedown', (e) => {
+        if (e.target === seekTrack || seekTrack.contains(e.target)) return;
+        dismissHints();
+        mouseDragActive = true;
+        mouseDragBaseX = e.clientX;
+        mouseDragBaseTime = video.currentTime;
+        mouseMoved = false;
+        showControls();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!mouseDragActive) return;
+        const dx = e.clientX - mouseDragBaseX;
+        if (Math.abs(dx) > DRAG_MIN_DIST) {
+            mouseMoved = true;
+            const delta = dx * SCRUB_SENSITIVITY;
+            const newTime = clamp(mouseDragBaseTime + delta, 0, video.duration || 0);
+            video.currentTime = newTime;
+
+            const sign = delta >= 0 ? '+' : '';
+            seekDeltaTime.textContent = sign + delta.toFixed(1) + 's';
+            seekDelta.classList.add('show');
+        }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if (!mouseDragActive) return;
+        mouseDragActive = false;
+
+        if (mouseMoved) {
+            setTimeout(() => seekDelta.classList.remove('show'), 600);
+            showToast('Seeked to ' + formatTime(video.currentTime));
+        } else {
+            // Was a click, not a drag
+            const wasPlaying = !video.paused;
+            togglePlay();
+            flashCenterIcon(wasPlaying);
+            showToast(wasPlaying ? '⏸ Paused' : '▶ Playing');
+        }
+    });
+
+    // Prevent text selection during drag
+    document.getElementById('player-wrapper').addEventListener('dragstart', e => e.preventDefault());
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+        switch (e.key) {
+            case ' ':
+            case 'k':
+                e.preventDefault();
+                const wasPlaying = !video.paused;
+                togglePlay();
+                flashCenterIcon(wasPlaying);
+                showToast(wasPlaying ? '⏸ Paused' : '▶ Playing');
+                break;
+            case 'ArrowRight':
+                video.currentTime = clamp(video.currentTime + 5, 0, video.duration);
+                showToast('▶▶ +5s');
+                showControls();
+                break;
+            case 'ArrowLeft':
+                video.currentTime = clamp(video.currentTime - 5, 0, video.duration);
+                showToast('◀◀ -5s');
+                showControls();
+                break;
+            case '>':
+                video.playbackRate = clamp(video.playbackRate + 0.25, 0.25, 4);
+                updateSpeedBadge();
+                showToast('Speed: ' + video.playbackRate.toFixed(2) + '×');
+                break;
+            case '<':
+                video.playbackRate = clamp(video.playbackRate - 0.25, 0.25, 4);
+                updateSpeedBadge();
+                showToast('Speed: ' + video.playbackRate.toFixed(2) + '×');
+                break;
+        }
+    });
+
+    // ── Pointer move shows controls ───────────────────────────────────────────
+    document.getElementById('player-wrapper').addEventListener('mousemove', () => showControls());
+
+    // ── Initial state ─────────────────────────────────────────────────────────
+    showControls();
+</script>
 </body>
 </html>
